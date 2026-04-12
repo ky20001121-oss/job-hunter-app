@@ -11,20 +11,24 @@ from selenium.webdriver.common.keys import Keys
 from webdriver_manager.chrome import ChromeDriverManager
 
 def scrape_engage_jobs_auto():
-    profile_path = os.path.join(os.path.expanduser("~"), "Desktop", "engage_profile")
-    if not os.path.exists(profile_path):
-        os.makedirs(profile_path)
-
     options = Options()
-    options.add_argument(f"--user-data-dir={profile_path}")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--window-size=1920,1080")
+    
+    # --- クラウド/Linux環境向けの設定を追加 ---
+    options.add_argument("--headless")  # 画面を出さない（クラウドでは必須）
+    options.add_argument("--no-sandbox") # 権限エラー回避
+    options.add_argument("--disable-dev-shm-usage") # メモリ不足回避
+    
+    # ローカルのログイン維持機能は、クラウドではエラーの元になるので一旦無効化
+    # profile_path の設定箇所をコメントアウトするか削除します
+    
     options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_experimental_option("detach", True)
+    options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
+    # クラウド環境では webdriver-manager が自動で最適なドライバを拾ってくれます
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
+    
+    # ...（以下、抽出ロジックへ続く）
 
     try:
         wait = WebDriverWait(driver, 15)
