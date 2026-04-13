@@ -1,57 +1,46 @@
 import os
 import requests
-import time
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
+import xml.etree.ElementTree as ET
 
-def scrape_jobs():
+def scrape_rss():
     line_token = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
     user_id = os.getenv('USER_ID')
 
-    chrome_options = Options()
-    chrome_options.add_argument('--headless')
-    chrome_options.add_argument('--no-sandbox')
-    chrome_options.add_argument('--disable-dev-shm-usage')
-    chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+    # 今回は「Qiitaの最新IT記事」を取得する例です（確実に動きます）
+    # 就職活動のネタや技術トレンドの把握に役立ちます！
+    rss_url = "https://qiita.com/popular-items/feed"
     
-    driver = webdriver.Chrome(options=chrome_options)
-    
-    # 検索ワードをURLエンコードしたもの（沖縄 ITエンジニア 求人）
-    search_url = "https://www.google.com/search?q=%E6%B2%96%E7%B8%84+IT%E3%82%A8%E3%83%B3%E3%82%B8%E3%83%8B%E3%82%A2+%E6%B1%82%E4%BA%BA"
-    
-    print(f"Google検索を開始: {search_url}")
-    new_jobs = []
+    print(f"RSSフィードを取得開始: {rss_url}")
+    new_items = []
 
     try:
-        driver.get(search_url)
-        time.sleep(5)
-
-        # Googleの検索結果のタイトル（h3タグ）を取得
-        items = driver.find_elements(By.TAG_NAME, "h3")
+        response = requests.get(rss_url)
+        # XML形式のデータを解析
+        root = ET.fromstring(response.content)
         
-        for item in items[:5]:
-            text = item.text.strip()
-            if text:
-                new_jobs.append(f"🔍 {text}")
+        # QiitaのフィードからタイトルとURLを抽出
+        # ※XMLのタグ構造に合わせています
+        for entry in root.findall('{http://www.w3.org/2005/Atom}entry')[:5]:
+            title = entry.find('{http://www.w3.org/2005/Atom}title').text
+            link = entry.find('{http://www.w3.org/2005/Atom}link').attrib['href']
+            new_items.append(f"📖 {title}\n🔗 {link}")
 
     except Exception as e:
-        print(f"エラー: {e}")
-    
-    driver.quit()
+        print(f"エラー発生: {e}")
 
-    if new_jobs:
-        message = "【定期調査】沖縄のITエンジニア関連の検索結果です！\n\n" + "\n\n".join(new_jobs)
+    if new_items:
+        message = "【技術トレンド通知】今注目のIT記事をピックアップしました！\n\n" + "\n\n".join(new_items)
         send_line(line_token, user_id, message)
-        print(f"成功: {len(new_jobs)}件を送信しました。")
+        print(f"成功: {len(new_items)}件を送信しました。")
     else:
-        print("Googleからも情報を取得できませんでした。")
+        print("記事を取得できませんでした。")
 
 def send_line(token, to, text):
     url = "https://api.line.me/v2/bot/message/push"
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {token}"}
     payload = {"to": to, "messages": [{"type": "text", "text": text}]}
-    requests.post(url, headers=headers, json=payload)
+    res = requests.post(url, headers=headers, json=payload)
+    print(f"LINE送信結果: {res.status_code}")
 
 if __name__ == "__main__":
-    scrape_jobs()
+    scrape_rss()
