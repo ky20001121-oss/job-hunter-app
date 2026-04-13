@@ -17,36 +17,46 @@ def scrape_jobs():
     
     driver = webdriver.Chrome(options=chrome_options)
     
-    # ターゲットを「求人ボックス」の沖縄×エンジニアに変更
-    search_url = "https://求人ボックス.com/沖縄県のエンジニアの求人"
+    # 沖縄のITエンジニア求人に絞ったURL
+    search_url = "https://求人ボックス.com/沖縄県のITエンジニアの求人"
     
-    print(f"ターゲットを変更して検索開始: {search_url}")
+    print(f"検索開始: {search_url}")
     new_jobs = []
 
     try:
         driver.get(search_url)
-        time.sleep(10) # しっかり読み込み待機
+        time.sleep(8) # 読み込みを待つ
 
-        # 求人タイトルのクラス名を指定（求人ボックスの一般的な構成）
-        items = driver.find_elements(By.CSS_SELECTOR, "span.k-p-title, h3, .s-jobTitle")
+        # ターゲット：求人ボックスのタイトルが入る可能性のある場所を総ざらい
+        selectors = [
+            "span.k-p-title", 
+            "h3.s-jobTitle", 
+            "p.s-jobTitle",
+            "div.p-job__title"
+        ]
         
-        for item in items[:5]:
-            text = item.text.strip()
-            if len(text) >= 5:
-                new_jobs.append(f"📌 {text}")
+        for selector in selectors:
+            items = driver.find_elements(By.CSS_SELECTOR, selector)
+            for item in items:
+                text = item.text.strip()
+                if len(text) >= 5: # 短すぎるゴミデータを除外
+                    new_jobs.append(f"📌 {text}")
+            
+            if new_jobs: break # 何か見つかったらループを抜ける
 
     except Exception as e:
-        print(f"エラー発生: {e}")
+        print(f"解析エラー: {e}")
     
-    current_title = driver.title
     driver.quit()
 
     if new_jobs:
-        message = "【求人ボックス通知】沖縄のエンジニア求人を検出！\n\n" + "\n\n".join(new_jobs)
+        # 重複を削除して最大5件送信
+        unique_jobs = list(dict.fromkeys(new_jobs))[:5]
+        message = "【最新】沖縄のエンジニア求人を見つけました！\n\n" + "\n\n".join(unique_jobs)
         send_line(line_token, user_id, message)
-        print(f"成功: {len(new_jobs)}件送信しました。")
+        print(f"成功: {len(unique_jobs)}件をLINEに送りました。")
     else:
-        print(f"取得失敗。現在のページタイトル: {current_title}")
+        print(f"求人タイトルが見つかりませんでした。別の構造を探す必要があります。")
 
 def send_line(token, to, text):
     url = "https://api.line.me/v2/bot/message/push"
